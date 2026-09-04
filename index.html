@@ -4497,6 +4497,63 @@ function latido(){
   }
 }
 
+// ---------- las gráficas se dibujan solas ----------
+// La línea se traza de izquierda a derecha con stroke-dashoffset, el área sube
+// detrás y el punto final aparece al llegar. Se usa la forma numérica de Motion
+// (la misma de [data-count] y --p) en vez de animar la propiedad SVG: funciona
+// igual en todos los navegadores y no depende de qué atributos entienda la librería.
+function dibujarGraficas(quieto){
+  const svgs=[...document.querySelectorAll('.trend svg')];
+  if(!svgs.length)return;
+  for(const svg of svgs){
+    const lineas=[...svg.querySelectorAll('.tline,.tghost')];
+    const areas=[...svg.querySelectorAll('path[fill^="url"]')];
+    const puntas=[...svg.querySelectorAll('.tend')];
+    if(quieto){limpiarGrafica(svg);continue}
+    for(const [i,l] of lineas.entries()){
+      let L=0;try{L=l.getTotalLength()}catch{}
+      if(!L||!isFinite(L))continue;
+      l.style.strokeDasharray=L;l.style.strokeDashoffset=L;
+      const a=M.animate(L,0,{duration:1.05,ease:EASE,delay:i*.12,onUpdate:v=>l.style.strokeDashoffset=v});
+      if(a&&a.finished)a.finished.then(()=>{l.style.strokeDasharray='';l.style.strokeDashoffset=''}).catch(()=>{});
+    }
+    for(const ar of areas){ar.style.opacity='0';tras(M.animate(ar,{opacity:[0,1]},{duration:.85,ease:EASE,delay:.2}),ar)}
+    // el punto crece con el radio, no con scale: en SVG el origen de transformación
+    // es la esquina del lienzo y el punto saldría volando desde arriba a la izquierda
+    for(const p of puntas){
+      const r=+p.getAttribute('r')||4;
+      p.setAttribute('r',0);p.style.opacity='0';
+      M.animate(0,r,{duration:.5,ease:EASE,delay:.9,onUpdate:v=>p.setAttribute('r',v)});
+      tras(M.animate(p,{opacity:[0,1]},{duration:.3,ease:EASE,delay:.9}),p);
+    }
+  }
+  // red de seguridad: si el navegador congela fotogramas, ninguna línea puede
+  // quedarse a medio trazar ni ningún punto con radio cero
+  clearTimeout(dibujarGraficas._t);
+  dibujarGraficas._svgs=svgs;
+  dibujarGraficas._t=setTimeout(()=>{for(const svg of dibujarGraficas._svgs||[])if(svg.isConnected)limpiarGrafica(svg)},1600);
+}
+function limpiarGrafica(svg){
+  for(const l of svg.querySelectorAll('.tline,.tghost')){l.style.strokeDasharray='';l.style.strokeDashoffset=''}
+  for(const ar of svg.querySelectorAll('path[fill^="url"]')){ar.style.opacity='';limpiar(ar)}
+  for(const p of svg.querySelectorAll('.tend')){p.setAttribute('r',p.dataset.r||4);p.style.opacity='';limpiar(p)}
+}
+
+// ---------- la meta cobra vida al entrar ----------
+// El CSS ya tiene la transición de 1,1 s sobre el filtro de la foto y el ancho de
+// la barra; solo hay que ponerla en cero y devolverla al valor real. Animar --p
+// a mano fotograma a fotograma pelearía con esa misma transición.
+function despertarMeta(quieto){
+  const f=document.querySelector('.metafoto');if(!f)return;
+  const fin=f.style.getPropertyValue('--p');
+  if(quieto||!fin||!(parseFloat(fin)>0))return;
+  f.style.setProperty('--p','0');
+  void f.offsetWidth; // fuerza el reflujo: sin esto el navegador junta los dos cambios y no hay transición
+  requestAnimationFrame(()=>f.style.setProperty('--p',fin));
+  clearTimeout(despertarMeta._t);
+  despertarMeta._t=setTimeout(()=>{if(f.isConnected)f.style.setProperty('--p',fin)},1600);
+}
+
 // ---------- sustituye el motor de animación del panel ----------
 animateUI=function(){
   const sec=Q('#secs .sec');
@@ -4526,7 +4583,7 @@ animateUI=function(){
     if(t)tras(M.animate(t,{opacity:[0,1],y:[10,0]},{duration:.42,ease:EASE}),t);
     if(e)tras(M.animate(e,{opacity:[0,1],y:[6,0]},{duration:.38,ease:EASE,delay:.04}),e);
   }
-  pastilla();latido();
+  pastilla();latido();dibujarGraficas(quieto);despertarMeta(quieto);
 };
 
 // ---------- cambio de sala: la anterior se va antes de dibujar la nueva ----------
