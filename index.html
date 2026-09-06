@@ -2019,6 +2019,7 @@ for(const d of S.deals){if(!Array.isArray(d.log)){d.log=[];n++}}
 for(const i of S.ideas){if(!i.votes||typeof i.votes!=='object'){i.votes={};n++}if(!Array.isArray(i.comments)){i.comments=[];n++}}
 for(const rid of RETIRED)n+=purgeMember(rid);
 try{n+=sembrarMeta()}catch(e){console.warn('semilla meta',e)}
+try{n+=darDeAlta()}catch(e){console.warn('alta',e)}
 const seen=new Set();S.members=S.members.filter(m=>{if(!m.id||seen.has(m.id)){n++;return false}seen.add(m.id);return true});
 if(!S.members.length){S.members=structuredClone(DEFAULT_STATE.members);n++}
 for(const m of S.members){if(typeof m.xp!=='number'){m.xp=0;n++}if(!m.name){m.name=m.id;n++}}
@@ -2494,6 +2495,23 @@ function sembrarMeta(){
   const m=S.members.find(x=>x.id===SEMILLA_META.id);
   if(!m||m.dream)return 1;
   m.dream={name:SEMILLA_META.name,photo:SEMILLA_META.photo,target:SEMILLA_META.target,log:[],ts:Date.now()};
+  return 1;
+}
+// --- alta de gente nueva, una sola vez cada uno ---
+// Va como migración y NO en DEFAULT_STATE: Carlos es una persona de ESTE equipo,
+// no parte del panel; quien clone el repo no debe encontrárselo dentro. Y va aquí
+// y no editando el estado embebido porque el panel puede estar leyendo el estado
+// del archivo compartido o de la nube: una migración entra mire donde mire.
+// Sin contraseña a propósito: la crea él la primera vez que entre.
+const ALTAS=[{id:'carlos',name:'Carlos',color:'#8CC5A0',role:'Miembro'}];
+function darDeAlta(){
+  if(S.altas)return 0;
+  S.altas=1;
+  for(const a of ALTAS){
+    if(S.members.some(m=>m.id===a.id))continue;
+    S.members.push({id:a.id,name:a.name,color:a.color,pass:null,xp:0,role:a.role,
+      perm:'member',canEdit:true,allow:PERM_PRESETS.basico.secs.slice()});
+  }
   return 1;
 }
 // ===== LA META: la foto de por qué trabajas, y cuánto te falta =====
