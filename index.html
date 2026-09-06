@@ -331,6 +331,12 @@ header.top h1 .msr{color:var(--hc,var(--oro));font-size:28px}
 @keyframes shine{0%{left:-60%}40%,100%{left:130%}}
 .savest{font-size:11px;color:var(--mut);font-family:var(--mono);display:flex;align-items:center;gap:6px}
 .savest i{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block}
+/* aviso de que nada de esto sale de este dispositivo. El punto de 7 px de .savest
+ no basta: en móvil su texto está oculto y no hay forma de enterarse. */
+.soloaqui{display:flex;align-items:center;gap:11px;padding:11px 14px;margin:0 0 18px;border-radius:14px;background:rgba(240,138,138,.09);border:1px solid rgba(240,138,138,.34);font-size:13.5px;line-height:1.4}
+.soloaqui>.msr{color:var(--crit);font-size:21px;flex:none}
+.soloaqui b{color:var(--tx);font-weight:700}
+.soloaqui button{flex:none}
 .savest.ok i{background:var(--ok);box-shadow:0 0 8px var(--ok)}.savest.busy i{background:var(--warn);animation:flick .5s infinite alternate}.savest.local i{background:var(--vio)}.savest.err i{background:var(--crit)}
 .lvlup{position:fixed;inset:0;display:none;place-items:center;background:rgba(5,8,16,.82);z-index:80}
 .lvlup.on{display:grid}
@@ -672,6 +678,8 @@ input:focus,select:focus,textarea:focus{border-color:rgba(230,57,70,.55)}
   header.top .hbtn .msr{font-size:20px}
   .savest{order:2;flex:none;margin-left:2px}
   .savest span{display:none}
+  .soloaqui{flex-wrap:wrap}
+  .soloaqui button{width:100%}
   .stats{display:flex;order:5;flex:1 1 100%;gap:8px;overflow-x:auto;scrollbar-width:none;margin:6px -12px 0;padding:0 12px 2px;-webkit-overflow-scrolling:touch}
   .stats::-webkit-scrollbar{display:none}
   .stats .stat{flex:none;min-width:auto;padding:6px 12px;border-radius:12px;flex-direction:row;align-items:baseline;gap:6px}
@@ -1056,6 +1064,7 @@ nav#nav .nb,nav#nav2 .nb{position:relative;z-index:1}
       <button class="hbtn" title="Tema claro / oscuro" onclick="themeToggle()"><span class="msr" data-fb="contrast">contrast</span></button>
       <div class="savest" id="savest"><i></i><span>—</span></div>
     </header>
+    <div id="soloaqui" class="soloaqui hide"></div>
     <div id="secs"></div>
   </main>
   <nav id="nav2"></nav>
@@ -1695,7 +1704,23 @@ const fmtDay=ds=>{const d=new Date(ds+'T12:00:00');return d.toLocaleDateString('
 const timeAgo=ts=>{const s=(Date.now()-ts)/1000;if(s<60)return'ahora';if(s<3600)return Math.floor(s/60)+' min';if(s<86400)return Math.floor(s/3600)+' h';return Math.floor(s/86400)+' d'};
 function deepMerge(base,over){if(Array.isArray(base))return Array.isArray(over)?over:base;if(base&&typeof base==='object'){const o={...base};for(const k in over||{})o[k]=(k in base)?deepMerge(base[k],over[k]):over[k];return o}return over===undefined?base:over}
 function toast(msg,cls=''){const t=$('#toast');t.textContent=msg;t.className='toast on '+cls;clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2600)}
-function setSave(cls,txt){for(const el of document.querySelectorAll('.savest')){el.className='savest '+cls;el.querySelector('span').textContent=txt}}
+function setSave(cls,txt){for(const el of document.querySelectorAll('.savest')){el.className='savest '+cls;el.querySelector('span').textContent=txt}try{avisoSolo(cls)}catch{}}
+// Guardar "solo en este navegador" significa que nadie del equipo verá nada de lo
+// que escribas. Eso no se puede comunicar con un punto de 7 px cuyo texto ademas
+// se oculta en móvil. Cuelga del propio setSave, que ya conoce el modo real de
+// guardado, así que el aviso no puede desincronizarse de la verdad.
+function avisoSolo(cls){
+  const b=document.getElementById("soloaqui");if(!b)return;
+  // "busy" y "err" son estados de paso: solo cambian el aviso los dos que dicen
+  // de verdad dónde acaban los datos, o parpadearía en cada guardado.
+  if(cls==="ok"){b.classList.add("hide");b.innerHTML="";return}
+  if(cls!=="local")return;
+  const admin=typeof isAdmin==="function"&&ME&&isAdmin();
+  b.innerHTML='<span class="msr" data-fb="!">cloud_off</span><div class="grow"><b>Esto se guarda solo en este dispositivo.</b> Nadie más del equipo va a ver lo que escribas aquí.</div>'+
+    (admin?'<button class="sm pri" onclick="cloudForm()">Conectar la nube</button>':'<span class="pill">avísale a un administrador</span>');
+  b.classList.remove("hide");
+  if(typeof iconsFix==="function")iconsFix();
+}
 
 // ===== PERSISTENCIA (compartida vía artifact, con respaldo local) =====
 async function boot(){
