@@ -1868,7 +1868,7 @@ function buildNav(){
 }
 function roomsSheet(){const me=mem(ME);const lv=level(me.xp||0);openModal(`<button class="close" onclick="closeModal()">✕</button><div class="sheet-me">${av(me)}<div class="grow" style="min-width:0"><b>${h(me.name)}</b><div class="mut" style="font-size:12px">${h(me.role||'')}· nivel ${lv.lvl} · ${me.xp||0} XP</div><div class="bar" style="margin-top:4px;height:4px"><i style="width:${lv.pct}%"></i></div></div><button class="xs" onclick="closeModal();go('perfil')">perfil</button><button class="xs" onclick="photoPick(ME)" title="foto"><span class="msr" style="font-size:16px">photo_camera</span></button><button class="xs" onclick="themeToggle()" title="tema"><span class="msr" style="font-size:16px">contrast</span></button><button class="xs ghost" onclick="closeModal();logout()">salir</button></div><input id="rs-q" placeholder="Buscar sala…" oninput="for(const b of document.querySelectorAll('#modal .room'))b.style.display=b.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none'" style="margin-bottom:6px">${NAV.map(([g,items])=>{const its=items.filter(([id])=>canSee(id));if(!its.length)return '';return `<div class="eyebrow" style="margin:12px 0 6px">${g}</div><div class="sysmap">${its.map(([id,l])=>`<button class="room ${SEC===id?'on':''}" style="--c:${NAVC[id]}" onclick="closeModal();go('${id}')">${ic(id)}<b>${l}</b><small>${g}</small>${(()=>{const e=document.getElementById('cnt-'+id);return e&&!e.classList.contains('hide')&&e.textContent?`<span class="pill crit" style="font-size:10px;padding:0 6px">${e.textContent}</span>`:''})()}</button>`).join('')}</div>`}).join('')}`);iconsFix()}
 function quickCreate(){const A=[['Tarea','add_task','var(--esm)',()=>{go('tareas');setTimeout(()=>openModal(taskForm(),true),80)}],['Ingreso','payments','var(--ok)',()=>{go('ingresos');setTimeout(()=>quickRevenue(),80)}],['Gasto','receipt_long','var(--warn)',()=>{go('finanzas');setTimeout(()=>typeof expForm==='function'&&expForm(),120)}],['Deal / cliente','handshake','var(--nar)',()=>{go('crm');setTimeout(()=>dealForm(),120)}],['Contenido','movie','var(--vio)',()=>{go('contenido');setTimeout(()=>openModal(contentForm(),true),120)}],['Guion','description','var(--vio)',()=>{go('contenido');setTimeout(()=>{ctTab='guiones';ctScriptNew('');},120)}],['Idea','lightbulb','var(--oro)',()=>{go('ideas');setTimeout(()=>ideaPostForm(),120)}],['Nota','sticky_note_2','var(--cielo)',()=>{go('notas');setTimeout(()=>noteNew(),120)}],['Gym hoy','fitness_center','var(--nar)',()=>{go('gym');setTimeout(()=>gToggle(TODAY()),120)}],['Evento','event','var(--azul)',()=>{go('agenda');setTimeout(()=>typeof calForm==='function'&&calForm(),120)}],['Enfoque','timer','var(--ia)',()=>go('enfoque')],['Mensaje','chat','var(--rosa)',()=>go('chat')]];window._qc=A;openModal(`<button class="close" onclick="closeModal()">✕</button><h3>Crear</h3><div class="qc">${A.map((a,i)=>`<button style="--c:${a[2]}" onclick="closeModal();window._qc[${i}][3]()"><span class="msr">${a[1]}</span>${a[0]}</button>`).join('')}</div>`,true);iconsFix()}
-function go(id){if(!canSee(id)){toast('Esa sala es solo para administradores');return}SEC=id;stashSession();try{if(!history.state||history.state.sec!==id)history.pushState({sec:id},'')}catch{}render();window.scrollTo({top:0});}
+function go(id){if(!canSee(id)){toast('Esa sala es solo para administradores');return}SEC=id;try{cloudRitmo()}catch{}stashSession();try{if(!history.state||history.state.sec!==id)history.pushState({sec:id},'')}catch{}render();window.scrollTo({top:0});}
 window.addEventListener('popstate',e=>{try{
  if($('#modal').classList.contains('on')){closeModal();history.pushState({sec:SEC},'');return}
  if($('#tele')&&$('#tele').classList.contains('on')){ctTeleClose();history.pushState({sec:SEC},'');return}
@@ -2055,7 +2055,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 // ===== NUBE (Supabase): estado compartido fuera de claude.ai. Nadie necesita cuenta de Claude: link + clave del equipo =====
 // Valores por defecto embebidos en el build (URL y anon key son públicos por diseño; lo que protege es la clave del equipo).
 const CLOUD_DEFAULT={url:'',key:'',team:'nexo'};
-let cloud={url:'',key:'',team:'nexo',pass:'',on:false,lastSeen:0,pollTimer:null,dirty:false,busy:false};
+let cloud={url:'',key:'',team:'nexo',pass:'',on:false,lastSeen:0,pollTimer:null,ritmo:0,dirty:false,busy:false};
 function cloudLoad(){try{const c=JSON.parse(localStorage.getItem('nexo-cloud')||'{}');cloud.url=c.url||CLOUD_DEFAULT.url;cloud.key=c.key||CLOUD_DEFAULT.key;cloud.team=c.team||CLOUD_DEFAULT.team;cloud.pass=c.pass||''}catch{}
  const q=new URLSearchParams(location.search);if(q.get('nube')){try{const c=JSON.parse(atob(q.get('nube')));cloud.url=c.u||cloud.url;cloud.key=c.k||cloud.key;cloud.team=c.t||cloud.team;cloudStore();history.replaceState(null,'',location.pathname)}catch{}}
  cloud.on=!!(cloud.url&&cloud.key);return cloud.on}
@@ -2092,7 +2092,24 @@ async function cloudSave(json){if(!cloud.pass)return;if(cloud.busy){cloud.dirty=
  try{const r=await cloudPut(json,S.savedAt);cloud.lastSeen=(r&&r.saved_at)||S.savedAt;lastPublished=json;setSave('ok','guardado en la nube · '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}));saveMode='cloud'}
  catch(e){if(e.code==='bad_key'){setSave('err','clave del equipo incorrecta');cloud.pass='';cloudStore();toast('La clave del equipo cambió. Recarga para volver a entrar.','xp')}else if(e.code==='too_large'||e.status===413){setSave('err','demasiados datos: limpia chat/eventos en Config')}else{setSave('err','sin conexión: reintentando…');saveMode='local';setTimeout(doSave,8000+Math.random()*4000)}}
  cloud.busy=false;if(cloud.dirty){cloud.dirty=false;doSave()}}
-function cloudPollStart(){clearInterval(cloud.pollTimer);cloud.pollTimer=setInterval(cloudPoll,20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudPoll()})}
+// 20 s está bien para el panel y está muerto para una conversación: mandas un
+// mensaje y el otro lo ve cuando le toque. Mientras alguien mira el chat el
+// sondeo baja a 4 s, y al salir vuelve solo a 20, así que el ritmo rápido solo
+// se paga mientras hay alguien leyendo.
+function pollCada(){return (SEC==='chat'&&!document.hidden)?4000:20000}
+function cloudPollStart(){
+  clearTimeout(cloud.pollTimer);
+  const vuelta=async()=>{try{await cloudPoll()}catch{}cloud.ritmo=pollCada();cloud.pollTimer=setTimeout(vuelta,cloud.ritmo)};
+  cloud.ritmo=pollCada();cloud.pollTimer=setTimeout(vuelta,cloud.ritmo);
+  // el oyente va una sola vez: cloudPollStart se llama en cada arranque de nube
+  if(!cloudPollStart.vis){cloudPollStart.vis=1;document.addEventListener('visibilitychange',()=>{if(!document.hidden){cloudRitmo();cloudPoll().catch(()=>{})}})}
+}
+// Reengancha el sondeo al ritmo que toca ahora, sin esperar al próximo tic.
+function cloudRitmo(){
+  if(!(typeof cloudConfigured==='function'&&cloudConfigured()&&cloud.pass))return;
+  if(pollCada()===cloud.ritmo)return;
+  cloudPollStart();
+}
 async function cloudPoll(){if(!cloudConfigured()||!cloud.pass||cloud.busy||document.hidden)return;try{const remoteAt=await cloudPing();if(saveMode==='local')saveMode='cloud';
   if(remoteAt>(S.savedAt||0)&&remoteAt>cloud.lastSeen){if(savePending||cloud.busy){return}/* hay cambios locales pendientes: se guardan primero */
    const r=await cloudGet();if(!r||!r.data)return;const remote=r.data;remote.savedAt=r.saved_at||remote.savedAt;cloud.lastSeen=r.saved_at||0;
