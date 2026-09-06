@@ -2503,14 +2503,22 @@ function sembrarMeta(){
 // y no editando el estado embebido porque el panel puede estar leyendo el estado
 // del archivo compartido o de la nube: una migración entra mire donde mire.
 // Sin contraseña a propósito: la crea él la primera vez que entre.
+// Ve el panel entero. La lista sale de NAV y no escrita a mano, así una sala
+// nueva le llega sola. Config es la única fuera, y no por criterio mío: canSee()
+// se la niega a quien no sea admin, así que apuntársela sería anotar un permiso
+// que el panel nunca va a respetar.
 const ALTAS=[{id:'carlos',name:'Carlos',color:'#8CC5A0',role:'Miembro'}];
+const ALTAS_V=2; // sube al cambiar permisos: la migración vuelve a pasar una vez
+function salasTodas(){return NAV.flatMap(([g,items])=>items.map(([i])=>i)).filter(s=>s!=='config')}
 function darDeAlta(){
-  if(S.altas)return 0;
-  S.altas=1;
+  if(S.altas>=ALTAS_V)return 0;
+  S.altas=ALTAS_V;
   for(const a of ALTAS){
-    if(S.members.some(m=>m.id===a.id))continue;
+    const ya=S.members.find(m=>m.id===a.id);
+    // si ya había entrado con la lista corta, se le amplía; a un admin no se le toca
+    if(ya){if(!isAdmin(ya.id)&&Array.isArray(ya.allow))ya.allow=salasTodas();continue}
     S.members.push({id:a.id,name:a.name,color:a.color,pass:null,xp:0,role:a.role,
-      perm:'member',canEdit:true,allow:PERM_PRESETS.basico.secs.slice()});
+      perm:'member',canEdit:true,allow:salasTodas()});
   }
   return 1;
 }
